@@ -38,16 +38,16 @@ priority order right, because the battery can't do everything at once.
 
 ## 🖥️ HMI — Energy Flow Dashboard
 
-The `hmi/index.html` mockup shows power flowing between solar, battery, grid, and
+The `index.html` mockup shows power flowing between solar, battery, grid, and
 factory load in real time, with a time-of-use schedule strip, live SOC and power
 factor readouts, and an alarm log — matching exactly the "power flowing into a
 factory" dashboard this project was scoped against.
 
-![HMI Dashboard](images/hmi-dashboard.png)
+![HMI Dashboard](hmi-dashboard.png)
 
 ## 🗺️ System Architecture
 
-![Architecture Diagram](images/architecture_diagram.svg)
+![Architecture Diagram](architecture_diagram.svg)
 
 ## ⚙️ Key Engineering Concepts
 
@@ -78,9 +78,9 @@ microgrid-bess-dispatch/
 
 ## 📄 Documentation
 
-- [I/O List &amp; Configuration Parameters](docs/IO_List.md)
-- [Functional Test Procedures](docs/Testing_Procedures.md)
-- [Full Technical Manual (PDF)](ebook/Microgrid_Technical_Manual.pdf) — 25-page project ebook covering demand-charge industry context, architecture, hardware, the dispatch-priority/capability-curve control philosophy, full annotated code, HMI design, alarm philosophy, testing/commissioning, and a HAZOP-style hazard register
+- [I/O List &amp; Configuration Parameters](IO_List.md)
+- [Functional Test Procedures](Testing_Procedures.md)
+- [Full Technical Manual (PDF)](Microgrid_Technical_Manual.pdf) — 25-page project ebook covering demand-charge industry context, architecture, hardware, the dispatch-priority/capability-curve control philosophy, full annotated code, HMI design, alarm philosophy, testing/commissioning, and a HAZOP-style hazard register
 
 ## ⚠️ Disclaimer
 
