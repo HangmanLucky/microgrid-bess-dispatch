@@ -5,7 +5,7 @@
 
 ### 🖥️🦠 Interactive HMI
 
-╰┈➤[Launch the BESS HMI](https://hangmanlucky.github.io/ai-vision-sorting/)
+╰┈➤[Launch the BESS HMI](https://hangmanlucky.github.io/microgrid-bess-dispatch/)
 
 ![Platform](https://img.shields.io/badge/PLC-Siemens%20S7--1500%20%2F%20CODESYS-blue)
 ![Language](https://img.shields.io/badge/Language-IEC%2061131--3%20Structured%20Text-informational)
