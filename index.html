@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Industrial Microgrid Controller &mdash; BESS Dispatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#10151C; --panel:#151B23; --line:#25303B;
+    --text-hi:#EAF1F7; --text-mid:#8FA1B0; --text-dim:#4E5F6E;
+    --solar:#FFC145; --battery:#2ECC71; --grid:#3B82F6; --factory:#C8D3DC;
+    --warn:#F5A623; --trip:#EF4B4B;
+    --mono:'IBM Plex Mono',monospace; --label:'Barlow Semi Condensed',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text-hi);font-family:var(--label);}
+  body{min-height:100vh;padding:18px;background:radial-gradient(1100px 550px at 50% -10%, rgba(59,130,246,0.07), transparent 60%), var(--bg);}
+  .console{max-width:1260px;margin:0 auto;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel);box-shadow:0 30px 80px rgba(0,0,0,0.5);}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:#0D1117;border-bottom:1px solid var(--line);}
+  .site{font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--grid);text-transform:uppercase;}
+  h1{font-size:17px;margin:2px 0 2px;letter-spacing:.04em;font-weight:700;text-transform:uppercase;}
+  .sub{font-size:11px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;}
+  .clock{font-family:var(--mono);font-size:13px;color:var(--text-mid);text-align:right;}
+  .clock span{display:block;color:var(--text-dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;}
+
+  .statusrow{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:1px solid var(--line);}
+  .pill{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.05em;padding:8px 14px;border-radius:3px;border:1px solid;color:var(--battery);border-color:rgba(46,204,113,.4);background:rgba(46,204,113,.08);}
+  .pill.warn{color:var(--warn);border-color:rgba(245,166,35,.4);background:rgba(245,166,35,.1);}
+  .pill.trip{color:var(--trip);border-color:rgba(239,75,75,.5);background:rgba(239,75,75,.12);}
+  .metabox{font-family:var(--mono);font-size:10.5px;color:var(--text-mid);}
+  .metabox b{color:var(--text-hi);}
+  .metaitem{display:inline-block;margin-left:18px;}
+
+  .touwrap{padding:10px 22px;border-bottom:1px solid var(--line);}
+  .toubar{position:relative;height:16px;border-radius:3px;overflow:hidden;display:flex;}
+  .touseg{height:100%;font-family:var(--mono);font-size:8px;color:#0D1117;display:flex;align-items:center;justify-content:center;}
+  .toumarker{position:absolute;top:-3px;width:2px;height:22px;background:#fff;}
+  .toulbl{font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:4px;}
+
+  .stage{padding:20px;background:#0D1117;}
+  .stage svg{width:100%;display:block;max-width:900px;margin:0 auto;}
+
+  .main{display:flex;border-top:1px solid var(--line);}
+  .col{padding:16px 20px;border-right:1px solid var(--line);}
+  .col:last-child{border-right:none;}
+  .celltitle{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin:0 0 10px;font-weight:600;}
+
+  .metric{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;padding:6px 0;border-bottom:1px solid var(--line);}
+  .metric b{color:var(--text-hi);font-size:12px;}
+
+  .socbar-outer{height:14px;border:1px solid var(--line);border-radius:3px;background:#0D1117;position:relative;overflow:hidden;margin:6px 0 2px;}
+  .socbar-fill{position:absolute;left:0;top:0;bottom:0;background:var(--battery);transition:width .5s ease;}
+  .soclimit{position:absolute;top:0;bottom:0;width:1px;background:var(--trip);}
+
+  .log{display:flex;flex-direction:column;max-height:190px;overflow-y:auto;margin-top:8px;}
+  .log-row{display:flex;padding:6px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:9.5px;}
+  .log-row:last-child{border-bottom:none;}
+  .log-time{color:var(--text-dim);flex:none;width:52px;}
+  .log-tag{flex:none;width:6px;height:6px;border-radius:50%;margin:3px 7px 0 0;}
+  .log-tag.ok{background:var(--battery);} .log-tag.trip{background:var(--trip);} .log-tag.warn{background:var(--warn);} .log-tag.info{background:var(--grid);}
+  .log-msg{color:var(--text-mid);}
+  ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+
+  .footer{padding:12px 22px;font-family:var(--mono);font-size:10px;color:var(--text-dim);border-top:1px solid var(--line);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div class="topbar">
+    <div>
+      <div class="site">SITE: NORTH INDUSTRIAL PARK &nbsp;&middot;&nbsp; PCC-01</div>
+      <h1>Industrial Microgrid Controller</h1>
+      <div class="sub">Intelligent BESS Dispatch &mdash; Peak Shaving / TOU Arbitrage / PF Correction</div>
+    </div>
+    <div class="clock"><span>Local Time</span><span id="clockval">14:00</span></div>
+  </div>
+
+  <div class="statusrow">
+    <div class="pill" id="statusPill">PEAK SHAVING ACTIVE</div>
+    <div class="metabox">
+      <span class="metaitem">PF <b id="pfVal">0.93</b> / <b>0.95</b></span>
+      <span class="metaitem">DEMAND <b id="demandVal">820</b> / <b id="thresholdVal">800</b> kW</span>
+    </div>
+  </div>
+
+  <div class="touwrap">
+    <div class="toubar" id="touBar"></div>
+    <div class="toumarker" id="touMarker"></div>
+    <div class="toulbl">TIME-OF-USE SCHEDULE &mdash; OFF-PEAK / SHOULDER / ON-PEAK</div>
+  </div>
+
+  <div class="stage">
+    <svg viewBox="0 0 900 420">
+      <!-- Bus -->
+      <circle cx="450" cy="210" r="14" fill="#1c232c" stroke="#3a4652" stroke-width="2"/>
+      <text x="450" y="245" font-family="IBM Plex Mono" font-size="9" fill="#4E5F6E" text-anchor="middle">PCC BUS</text>
+
+      <!-- Solar (top) -->
+      <g transform="translate(450,70)">
+        <rect x="-45" y="-30" width="90" height="50" rx="4" fill="#1c232c" stroke="#FFC145" stroke-width="2"/>
+        <line x1="-30" y1="-15" x2="30" y2="-15" stroke="#FFC145" stroke-width="1"/>
+        <line x1="-30" y1="0" x2="30" y2="0" stroke="#FFC145" stroke-width="1"/>
+        <line x1="-15" y1="-30" x2="-15" y2="20" stroke="#FFC145" stroke-width="1"/>
+        <line x1="15" y1="-30" x2="15" y2="20" stroke="#FFC145" stroke-width="1"/>
+        <text x="0" y="40" font-family="IBM Plex Mono" font-size="10" fill="#FFC145" text-anchor="middle">SOLAR PV</text>
+        <text x="0" y="54" font-family="IBM Plex Mono" font-size="12" fill="#fff" text-anchor="middle" id="solarKw">220 kW</text>
+      </g>
+      <line x1="450" y1="100" x2="450" y2="196" stroke="#FFC145" stroke-width="3" id="lineSolar"/>
+      <polygon points="444,190 456,190 450,200" fill="#FFC145" id="arrowSolar"/>
+
+      <!-- Battery (left) -->
+      <g transform="translate(160,210)">
+        <rect x="-50" y="-35" width="100" height="70" rx="6" fill="#1c232c" stroke="#2ECC71" stroke-width="2"/>
+        <rect x="45" y="-12" width="8" height="24" rx="2" fill="#2ECC71"/>
+        <rect x="-40" y="-25" width="70" height="50" rx="2" fill="none" stroke="#2ECC71" stroke-width="1"/>
+        <text x="0" y="47" font-family="IBM Plex Mono" font-size="10" fill="#2ECC71" text-anchor="middle">BATTERY (BESS)</text>
+        <text x="0" y="61" font-family="IBM Plex Mono" font-size="12" fill="#fff" text-anchor="middle" id="battKw">-320 kW</text>
+        <text x="0" y="75" font-family="IBM Plex Mono" font-size="9" fill="#8FA1B0" text-anchor="middle">SOC <tspan id="socVal">62</tspan>%</text>
+      </g>
+      <line x1="210" y1="210" x2="436" y2="210" stroke="#2ECC71" stroke-width="3" id="lineBattery"/>
+      <polygon points="424,204 424,216 436,210" fill="#2ECC71" id="arrowBattery"/>
+
+      <!-- Grid (right) -->
+      <g transform="translate(740,210)">
+        <rect x="-50" y="-35" width="100" height="70" rx="6" fill="#1c232c" stroke="#3B82F6" stroke-width="2"/>
+        <line x1="-20" y1="-25" x2="0" y2="0" stroke="#3B82F6" stroke-width="3"/>
+        <line x1="0" y1="0" x2="-10" y2="0" stroke="#3B82F6" stroke-width="3"/>
+        <line x1="-10" y1="0" x2="15" y2="25" stroke="#3B82F6" stroke-width="3"/>
+        <text x="0" y="47" font-family="IBM Plex Mono" font-size="10" fill="#3B82F6" text-anchor="middle">UTILITY GRID</text>
+        <text x="0" y="61" font-family="IBM Plex Mono" font-size="12" fill="#fff" text-anchor="middle" id="gridKw">480 kW</text>
+      </g>
+      <line x1="690" y1="210" x2="464" y2="210" stroke="#3B82F6" stroke-width="3" id="lineGrid"/>
+      <polygon points="476,204 476,216 464,210" fill="#3B82F6" id="arrowGrid"/>
+
+      <!-- Factory (bottom) -->
+      <g transform="translate(450,350)">
+        <rect x="-55" y="-30" width="110" height="55" rx="4" fill="#1c232c" stroke="#C8D3DC" stroke-width="2"/>
+        <rect x="-40" y="-15" width="18" height="30" fill="none" stroke="#C8D3DC" stroke-width="1"/>
+        <rect x="-12" y="-15" width="18" height="30" fill="none" stroke="#C8D3DC" stroke-width="1"/>
+        <rect x="16" y="-15" width="18" height="30" fill="none" stroke="#C8D3DC" stroke-width="1"/>
+        <text x="0" y="42" font-family="IBM Plex Mono" font-size="10" fill="#C8D3DC" text-anchor="middle">FACTORY LOAD</text>
+        <text x="0" y="56" font-family="IBM Plex Mono" font-size="12" fill="#fff" text-anchor="middle" id="loadKw">700 kW</text>
+      </g>
+      <line x1="450" y1="224" x2="450" y2="316" stroke="#C8D3DC" stroke-width="3" id="lineFactory"/>
+      <polygon points="444,306 456,306 450,318" fill="#C8D3DC"/>
+    </svg>
+  </div>
+
+  <div class="main">
+    <div class="col" style="flex:1;">
+      <p class="celltitle">Battery State of Charge</p>
+      <div class="socbar-outer"><div class="socbar-fill" id="socBar" style="width:62%;"></div><div class="soclimit" style="left:20%;"></div><div class="soclimit" style="left:95%;"></div></div>
+      <div class="metric"><span>SOC</span><b id="socMetric">62%</b></div>
+      <div class="metric"><span>Min / Max limits</span><b>20% / 95%</b></div>
+      <p class="celltitle" style="margin-top:16px;">Dispatch Priority</p>
+      <div style="font-family:var(--mono);font-size:9.5px;color:var(--text-dim);line-height:1.9;">
+        1. Battery protection (SOC limits)<br/>
+        2. Peak shaving (demand charge)<br/>
+        3. TOU arbitrage (charge/discharge)<br/>
+        4. Solar self-consumption<br/>
+        5. Idle
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <p class="celltitle">Power Quality</p>
+      <div class="metric"><span>Power Factor</span><b id="pfMetric">0.93</b></div>
+      <div class="metric"><span>Reactive Dispatch</span><b id="qMetric">45 kVAR</b></div>
+      <div class="metric"><span>Inverter Headroom</span><b id="headroomMetric">312 kVA</b></div>
+      <p class="celltitle" style="margin-top:16px;">Demand</p>
+      <div class="metric"><span>Net Load</span><b id="netLoadMetric">480 kW</b></div>
+      <div class="metric"><span>Threshold</span><b>800 kW</b></div>
+    </div>
+    <div class="col" style="flex:1.2;">
+      <p class="celltitle">Alarm &amp; Event Log</p>
+      <div class="log" id="logList"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Simulated HMI &mdash; desktop validation build, not for utility interconnection use</span>
+    <span>MICROGRID-BESS-DISPATCH v1.0 &middot; Author: Sipho Lucky Sibanda</span>
+  </div>
+</div>
+
+<script>
+  // ---- TOU schedule bar ----
+  var touBar = document.getElementById('touBar');
+  var segs = [
+    {start:0, end:6, label:'OFF-PEAK', color:'#2ECC71'},
+    {start:6, end:14, label:'SHOULDER', color:'#3B82F6'},
+    {start:14, end:20, label:'ON-PEAK', color:'#EF4B4B'},
+    {start:20, end:22, label:'SHOULDER', color:'#3B82F6'},
+    {start:22, end:24, label:'OFF-PEAK', color:'#2ECC71'}
+  ];
+  for (var i=0;i<segs.length;i++){
+    var s = segs[i];
+    var seg = document.createElement('div');
+    seg.className = 'touseg';
+    seg.style.width = ((s.end-s.start)/24*100) + '%';
+    seg.style.background = s.color;
+    seg.textContent = (s.end-s.start >= 4) ? s.label : '';
+    touBar.appendChild(seg);
+  }
+
+  function fmtClock(h){
+    var hh = Math.floor(h), mm = Math.floor((h-hh)*60);
+    function p(n){ return (n<10?'0':'')+n; }
+    return p(hh)+':'+p(mm);
+  }
+
+  var state = {
+    hour: 14.0, load: 700, solar: 220, soc: 62, batt: 0, netMeter: true,
+    reactive: 90, targetPF: 0.95, ratedKW: 500, ratedKVA: 550, threshold: 800
+  };
+
+  var logList = document.getElementById('logList');
+  function pushLog(msg, level){
+    var row = document.createElement('div'); row.className = 'log-row';
+    var t = document.createElement('span'); t.className='log-time'; t.textContent = fmtClock(state.hour);
+    var g = document.createElement('span'); g.className = 'log-tag ' + level;
+    var m = document.createElement('span'); m.className='log-msg'; m.textContent = msg;
+    row.appendChild(t); row.appendChild(g); row.appendChild(m);
+    if(logList.firstChild){ logList.insertBefore(row, logList.firstChild); } else { logList.appendChild(row); }
+    while(logList.children.length > 20){ logList.removeChild(logList.lastChild); }
+  }
+  pushLog('System enabled - dispatch controller active', 'info');
+
+  function setFlow(lineId, arrowId, active, reverse){
+    var line = document.getElementById(lineId);
+    line.setAttribute('stroke-dasharray', active ? '8 6' : 'none');
+    line.setAttribute('opacity', active ? '1' : '0.25');
+    if (arrowId) {
+      var ar = document.getElementById(arrowId);
+      if (ar) ar.setAttribute('opacity', active ? '1' : '0.25');
+    }
+  }
+
+  var dashOffset = 0;
+  function render(){
+    document.getElementById('clockval').textContent = fmtClock(state.hour);
+    var touMarker = document.getElementById('touMarker');
+    touMarker.style.left = (state.hour/24*100) + '%';
+
+    var netLoad = state.load - state.solar;
+    var onPeak = state.hour >= 14 && state.hour < 20;
+    var offPeak = state.hour >= 22 || state.hour < 6;
+
+    var mode = 'IDLE', battKw = 0;
+    if (netLoad > state.threshold) {
+      var avail = state.soc > 20 ? state.ratedKW : 0;
+      battKw = Math.min(netLoad - state.threshold, avail);
+      mode = avail > 0 ? 'PEAK_SHAVE' : 'PROTECT';
+    } else if (netLoad < 0) {
+      var availC = state.soc < 95 ? state.ratedKW : 0;
+      battKw = availC > 0 ? Math.max(netLoad, -availC) : 0;
+      mode = availC > 0 ? 'SOLAR_CHARGE' : (state.netMeter ? 'IDLE' : 'PROTECT');
+    } else if (onPeak && state.soc > 20) {
+      battKw = Math.min(netLoad, state.ratedKW);
+      mode = 'ARBITRAGE_DISCHARGE';
+    } else if (offPeak && state.soc < 90) {
+      battKw = -state.ratedKW * 0.6;
+      mode = 'ARBITRAGE_CHARGE';
+    }
+
+    var gridKw = netLoad - battKw;
+    state.soc = Math.max(5, Math.min(99, state.soc - (battKw/state.ratedKW)*0.15));
+
+    document.getElementById('solarKw').textContent = Math.round(state.solar) + ' kW';
+    document.getElementById('battKw').textContent = (battKw>=0?'+':'') + Math.round(battKw) + ' kW';
+    document.getElementById('gridKw').textContent = Math.round(gridKw) + ' kW';
+    document.getElementById('loadKw').textContent = Math.round(state.load) + ' kW';
+    document.getElementById('socVal').textContent = Math.round(state.soc);
+    document.getElementById('socMetric').textContent = Math.round(state.soc) + '%';
+    document.getElementById('socBar').style.width = state.soc + '%';
+    document.getElementById('demandVal').textContent = Math.round(netLoad);
+    document.getElementById('thresholdVal').textContent = state.threshold;
+    document.getElementById('netLoadMetric').textContent = Math.round(netLoad) + ' kW';
+
+    var activeMag = Math.abs(battKw);
+    var headroom = Math.sqrt(Math.max(0, state.ratedKVA*state.ratedKVA - activeMag*activeMag));
+    var pf = state.load>0 ? state.load/Math.sqrt(state.load*state.load + state.reactive*state.reactive) : 1;
+    var qDispatch = 0;
+    if (pf < state.targetPF) {
+      var reqQ = state.reactive * (1 - pf/state.targetPF);
+      qDispatch = Math.min(reqQ, headroom);
+    }
+    document.getElementById('pfVal').textContent = pf.toFixed(2);
+    document.getElementById('pfMetric').textContent = pf.toFixed(2);
+    document.getElementById('qMetric').textContent = Math.round(qDispatch) + ' kVAR';
+    document.getElementById('headroomMetric').textContent = Math.round(headroom) + ' kVA';
+
+    setFlow('lineSolar', 'arrowSolar', state.solar > 1);
+    setFlow('lineBattery', 'arrowBattery', Math.abs(battKw) > 1);
+    setFlow('lineGrid', 'arrowGrid', true);
+    document.getElementById('arrowBattery').setAttribute('points', battKw >= 0
+      ? '424,204 424,216 436,210' : '436,204 436,216 424,210');
+    document.getElementById('arrowGrid').setAttribute('points', gridKw >= 0
+      ? '476,204 476,216 464,210' : '464,204 464,216 476,210');
+
+    var pill = document.getElementById('statusPill');
+    var labels = {
+      PEAK_SHAVE: ['pill', 'PEAK SHAVING ACTIVE'], ARBITRAGE_DISCHARGE: ['pill', 'TOU ARBITRAGE - DISCHARGING'],
+      ARBITRAGE_CHARGE: ['pill', 'TOU ARBITRAGE - CHARGING'], SOLAR_CHARGE: ['pill', 'CHARGING FROM EXCESS SOLAR'],
+      PROTECT: ['pill warn', 'CAPACITY LIMIT REACHED'], IDLE: ['pill', 'IDLE']
+    };
+    var l = labels[mode] || labels.IDLE;
+    pill.className = l[0]; pill.textContent = l[1];
+  }
+  render();
+
+  var script = [
+    { t: 3000,  fn: function(){ state.load = 900; pushLog('Factory load spike - net demand above threshold', 'warn'); } },
+    { t: 6000,  fn: function(){ pushLog('Peak shaving engaged - battery covering excess demand', 'ok'); } },
+    { t: 10000, fn: function(){ state.load = 620; state.solar = 480; pushLog('Solar generation rising - net load falling', 'info'); } },
+    { t: 14000, fn: function(){ state.solar = 700; pushLog('Excess solar available - charging battery', 'ok'); } },
+    { t: 18000, fn: function(){ state.hour = 21.5; pushLog('Entering off-peak tariff period', 'info'); } },
+    { t: 21000, fn: function(){ state.solar = 40; state.load = 500; pushLog('Off-peak arbitrage charging toward target SOC', 'ok'); } },
+    { t: 25000, fn: function(){ state.hour = 14.5; state.load = 850; state.solar = 150; pushLog('Next on-peak period - arbitrage discharge preferred over grid import', 'info'); } }
+  ];
+  var cycleLength = 30000;
+  function runScript(){
+    for(var i=0;i<script.length;i++){
+      (function(step){ setTimeout(function(){ step.fn(); render(); }, step.t); })(script[i]);
+    }
+  }
+  runScript();
+  setInterval(runScript, cycleLength);
+
+  setInterval(function(){
+    state.load += (Math.random()-0.5)*8;
+    state.solar = Math.max(0, state.solar + (Math.random()-0.5)*6);
+    render();
+  }, 1200);
+</script>
+</body>
+</html>
